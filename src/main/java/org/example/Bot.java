@@ -85,12 +85,15 @@ public class Bot extends TelegramLongPollingBot {
     private void handleSendMessageError(Exception e) {
         LOGGER.warn("Failed to send message: " + e.getMessage());
     }
+    private String removeQuestionFromResponse(String question, String response) {
+        return response.replace(question, "").trim();
+    }
 
     private String getChatGPTResponse(String userInput) {
         MediaType JSON = MediaType.get("application/json; charset=utf-8");
         Map<String, Object> requestBodyMap = new HashMap<>();
-        requestBodyMap.put("prompt", userInput);
-        requestBodyMap.put("max_tokens", 30);
+        requestBodyMap.put("prompt", "Модель GPT-4, пожалуйста, ответь на вопрос на русском языке: " + userInput + "\n\n");
+        requestBodyMap.put("max_tokens", 1600);
         requestBodyMap.put("n", 1);
         requestBodyMap.put("stop", null);
         requestBodyMap.put("temperature", 0.5);
@@ -107,7 +110,9 @@ public class Bot extends TelegramLongPollingBot {
             String responseBody = response.body().string();
             Map<String, Object> responseMap = gson.fromJson(responseBody, Map.class); // Измените тип переменной на Map
             String chatGPTResponse = ((Map<String, String>) ((ArrayList) responseMap.get("choices")).get(0)).get("text");
+            chatGPTResponse = removeQuestionFromResponse(userInput, chatGPTResponse);
             return chatGPTResponse;
+
         } catch (IOException e) {
             LOGGER.warn("Failed to get ChatGPT response: " + e.getMessage());
             return "Error: Could not connect to ChatGPT API.";
