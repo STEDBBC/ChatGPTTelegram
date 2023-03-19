@@ -69,16 +69,11 @@ public class Bot extends TelegramLongPollingBot {
     @Override
     public void onUpdateReceived(Update update) {
         if (update.hasMessage() && update.getMessage().hasText()) {
-            LOGGER.info("Received message: " + update.getMessage().getText());
             String chatGPTResponse = getChatGPTResponse(update.getMessage().getText());
-            SendMessage message = createSendMessage(update.getMessage().getChatId(), chatGPTResponse);
-            try {
-                execute(message);
-            } catch (Exception e) {
-                handleSendMessageError(e);
-            }
+            handleSendMessage(update.getMessage().getChatId(), chatGPTResponse);
         }
     }
+
 
     private SendMessage createSendMessage(Long chatId, String text) {
         return SendMessage.builder()
@@ -107,17 +102,29 @@ public class Bot extends TelegramLongPollingBot {
                 .addHeader("Authorization", "Bearer " + OPENAI_API_KEY)
                 .post(RequestBody.create(requestBody, JSON))
                 .build();
-        LOGGER.info("Sending request to ChatGPT API...");
 
         try (Response response = client.newCall(request).execute()) {
             String responseBody = response.body().string();
-            HashMap<String, Object> responseMap = gson.fromJson(responseBody, HashMap.class);
-            String chatGPTResponse = ((HashMap<String, String>) ((ArrayList) responseMap.get("choices")).get(0)).get("text");
-            LOGGER.info("Received ChatGPT response: " + chatGPTResponse);
+            Map<String, Object> responseMap = gson.fromJson(responseBody, Map.class); // Измените тип переменной на Map
+            String chatGPTResponse = ((Map<String, String>) ((ArrayList) responseMap.get("choices")).get(0)).get("text");
             return chatGPTResponse;
         } catch (IOException e) {
             LOGGER.warn("Failed to get ChatGPT response: " + e.getMessage());
             return "Error: Could not connect to ChatGPT API.";
         }
     }
+    private void handleSendMessage(Long chatId, String text) {
+        if (text == null || text.trim().isEmpty()) {
+            LOGGER.warn("Received empty message from ChatGPT API. Skipping message sending.");
+            return;
+        }
+
+        SendMessage message = createSendMessage(chatId, text);
+        try {
+            execute(message);
+        } catch (Exception e) {
+            handleSendMessageError(e);
+        }
+    }
+
 }
